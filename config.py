@@ -1,30 +1,61 @@
-import json
 import os
+import json
+from typing import Any, Dict, Optional
 
-class ConfigLoader:
-    def __init__(self, config_file='config.json', defaults=None):
-        self.config_file = config_file
-        self.defaults = defaults or {}
-        self.config = self.load_config()
+DEFAULTS = {
+    "network": "mainnet",
+    "rpc_url": "https://mainnet.infura.io/v3/YOUR_PROJECT_ID",
+    "chain_id": 1,
+    "gas_price_gwei": 20,
+    "timeout": 30,
+    "max_retries": 3,
+    "log_level": "INFO",
+    "wallet_dir": "./data/wallets",
+    "use_encryption": True,
+    "api_key": ""
+}
 
-    def load_config(self):
-        if not os.path.isfile(self.config_file):
-            return self.defaults
-        with open(self.config_file, 'r') as file:
+class ConfigurationLoader:
+    """Loads wallet configuration using defaults, JSON file and environment variables."""
+
+    def __init__(self, config_path: Optional[str] = None) -> None:
+        self.config_path = config_path or os.getenv("WALLET_UTILITY_CONFIG", "config.json")
+        self.config: Dict[str, Any] = DEFAULTS.copy()
+        self._load_from_file()
+        self._apply_environment_overrides()
+
+    def _load_from_file(self) -> None:
+        """Load and merge config from JSON file if present."""
+        if os.path.exists(self.config_path):
             try:
-                config_data = json.load(file)
-            except json.JSONDecodeError:
-                return self.defaults
-        return {**self.defaults, **config_data}
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    file_config = json.load(f)
+                if isinstance(file_config, dict):
+                    self.config.update(file_config)
+            except (json.JSONDecodeError, OSError):
+                pass
 
-    def get(self, key, default=None):
+    def _apply_environment_overrides(self) -> None:
+        """Apply overrides from environment variables prefixed with WALLET_."""
+        prefix = "WALLET_"
+        for key, default_value in DEFAULTS.items():
+            env_var = prefix + key.upper()
+            if env_var in os.environ:
+                env_value = os.environ[env_var]
+                if isinstance(default_value, bool):
+                    self.config[key] = env_value.lower() in ("true", "1", "yes", "on")
+                elif isinstance(default_value, int):
+                    try:
+                        self.config[key] = int(env_value)
+                    except ValueError:
+                        self.config[key] = default_value
+                else:
+                    self.config[key] = env_value
+
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
+        """Retrieve configuration value or default."""
         return self.config.get(key, default)
 
-if __name__ == '__main__':
-    defaults = {
-        'API_URL': 'https://api.example.com',
-        'TIMEOUT': 30
-    }
-    config_loader = ConfigLoader(defaults=defaults)
-    print(config_loader.get('API_URL'))
-    print(config_loader.get('UNKNOWN_KEY', 'default_value'))
+    def get_all(self) -> Dict[str, Any]:
+        """Return a copy of the full configuration."""
+        return self.config.copy()
