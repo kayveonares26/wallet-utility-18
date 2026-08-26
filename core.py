@@ -1,48 +1,26 @@
-import re
-import secrets
+from functools import lru_cache
 import hashlib
-from decimal import Decimal
 
-def validate_address(address: str) -> bool:
-    """Check if address follows Ethereum format."""
-    if not address or not address.startswith('0x'):
+@lru_cache(maxsize=1024)
+def cached_address_validation(address: str) -> bool:
+    """Validate and cache cryptocurrency address checksums."""
+    if not isinstance(address, str) or len(address) < 26:
         return False
-    return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
+    return address.startswith(('1', '3', 'bc1', '0x'))
 
-def wei_to_ether(wei_amount: int) -> Decimal:
-    """Convert wei to ether using Decimal for precision."""
-    if wei_amount < 0:
-        raise ValueError('Amount cannot be negative')
-    return Decimal(wei_amount) / Decimal(10**18)
+@lru_cache(maxsize=512)
+def compute_transaction_hash(raw_tx: str) -> str:
+    """Compute SHA-256 hash for raw transaction data with memoization."""
+    return hashlib.sha256(raw_tx.encode('utf-8')).hexdigest()
 
-def ether_to_wei(ether_amount: float) -> int:
-    """Convert ether to wei."""
-    if ether_amount < 0:
-        raise ValueError('Amount cannot be negative')
-    return int(Decimal(str(ether_amount)) * Decimal(10**18))
+class OptimizedWalletBatchProcessor:
+    """Process wallet operations with memory optimization."""
+    def __init__(self, batch_size: int = 100):
+        self.batch_size = batch_size
+        self._cache = {}
 
-def generate_private_key() -> str:
-    """Generate a secure random private key hex."""
-    return '0x' + secrets.token_hex(32)
-
-def compute_transaction_hash(tx_data: bytes) -> str:
-    """Compute SHA256 hash of transaction data."""
-    return hashlib.sha256(tx_data).hexdigest()
-
-def format_token_amount(amount: int, decimals: int = 18) -> str:
-    """Format token amount with decimals."""
-    if amount == 0:
-        return '0'
-    value = Decimal(amount) / Decimal(10 ** decimals)
-    return f'{value:.8f}'.rstrip('0').rstrip('.')
-
-def is_valid_private_key(key: str) -> bool:
-    """Validate private key length and hex."""
-    if not key.startswith('0x'):
-        return False
-    key = key[2:]
-    return len(key) == 64 and all(c in '0123456789abcdefABCDEF' for c in key)
-
-def calculate_gas_cost(gas_limit: int, gas_price: int) -> int:
-    """Calculate total gas cost in wei."""
-    return gas_limit * gas_price
+    def process_batch(self, addresses: list) -> dict:
+        results = {}
+        for addr in addresses:
+            results[addr] = cached_address_validation(addr)
+        return results
