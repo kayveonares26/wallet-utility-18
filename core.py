@@ -1,26 +1,34 @@
+import time
 from functools import lru_cache
-import hashlib
+from typing import Dict, Any, List
 
-@lru_cache(maxsize=1024)
-def cached_address_validation(address: str) -> bool:
-    """Validate and cache cryptocurrency address checksums."""
-    if not isinstance(address, str) or len(address) < 26:
-        return False
-    return address.startswith(('1', '3', 'bc1', '0x'))
+class TransactionProcessor:
+    def __init__(self, cache_size: int = 1024) -> None:
+        self.cache_size = cache_size
 
-@lru_cache(maxsize=512)
-def compute_transaction_hash(raw_tx: str) -> str:
-    """Compute SHA-256 hash for raw transaction data with memoization."""
-    return hashlib.sha256(raw_tx.encode('utf-8')).hexdigest()
+    @lru_cache(maxsize=1024)
+    def compute_weighted_fee(self, gas_limit: int, gas_price: int, multiplier: float) -> float:
+        """Calculate optimized transaction fee with memoization."""
+        base_fee = gas_limit * gas_price
+        return round(base_fee * multiplier, 8)
 
-class OptimizedWalletBatchProcessor:
-    """Process wallet operations with memory optimization."""
-    def __init__(self, batch_size: int = 100):
-        self.batch_size = batch_size
-        self._cache = {}
-
-    def process_batch(self, addresses: list) -> dict:
-        results = {}
-        for addr in addresses:
-            results[addr] = cached_address_validation(addr)
+    def batch_process_wallets(self, wallet_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process wallet transactions in optimized batches."""
+        results = []
+        start_time = time.perf_counter()
+        
+        for item in wallet_data:
+            limit = item.get("gas_limit", 21000)
+            price = item.get("gas_price", 1000000000)
+            mult = item.get("multiplier", 1.1)
+            
+            fee = self.compute_weighted_fee(limit, price, mult)
+            results.append({
+                "address": item.get("address"),
+                "calculated_fee": fee,
+                "processed_at": time.time()
+            })
+            
+        execution_time = time.perf_counter() - start_time
+        print(f"Processed {len(results)} wallets in {execution_time:.6f} seconds")
         return results
