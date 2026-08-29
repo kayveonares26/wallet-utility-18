@@ -1,41 +1,58 @@
-from functools import lru_cache
-import time
-from typing import Dict, List
+import json
+from collections import defaultdict
+from typing import List, Dict, Any
 
-class TransactionProcessor:
-    def __init__(self, batch_size: int = 1000):
-        self.batch_size = batch_size
-        self._cache_hits = 0
+def clean_address(address: str) -> str:
+    """Remove whitespace and standardize wallet address."""
+    return address.strip().lower()
 
-    @lru_cache(maxsize=4096)
-    def _validate_checksum(self, tx_hash: str) -> bool:
-        # Optimized O(1) mathematical checksum simulation
-        if not tx_hash or len(tx_hash) < 10:
-            return False
-        return tx_hash.startswith("0x") and sum(ord(c) for c in tx_hash) % 2 == 0
+def is_valid_address(address: str) -> bool:
+    """Check if address is a valid 42-char hex ethereum address."""
+    if not address or not address.startswith("0x"):
+        return False
+    hex_part = address[2:]
+    return len(hex_part) == 40 and all(c in "0123456789abcdef" for c in hex_part)
 
-    def process_batch(self, transactions: List[Dict[str, str]]) -> List[Dict[str, any]]:
-        """Process wallet transactions with optimized memory and validation filtering."""
-        optimized_results = []
-        start_time = time.perf_counter()
+def process_transactions(transactions: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Aggregate balances from list of transactions."""
+    balances: Dict[str, float] = defaultdict(float)
+    for tx in transactions:
+        sender = clean_address(tx.get("from", ""))
+        receiver = clean_address(tx.get("to", ""))
+        amount = float(tx.get("amount", 0.0))
+        if is_valid_address(sender):
+            balances[sender] -= amount
+        if is_valid_address(receiver):
+            balances[receiver] += amount
+    return dict(balances)
 
-        for tx in transactions:
-            tx_id = tx.get("id", "")
-            # Leverage LRU cached validation for high-throughput crypto parsing
-            is_valid = self._validate_checksum(tx_id)
-            
-            if is_valid:
-                optimized_results.append({
-                    "id": tx_id,
-                    "status": "processed",
-                    "fee": float(tx.get("fee", 0.0)) * 0.98  # applied gas optimization rebate
-                })
+def reorganize_wallet_data(raw_wallets: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Reorganize raw data into cleaned wallet summaries."""
+    organized: Dict[str, Dict[str, Any]] = {}
+    for wallet_info in raw_wallets:
+        addr = clean_address(wallet_info.get("address", ""))
+        if not is_valid_address(addr):
+            continue
+        tx_list = wallet_info.get("transactions", [])
+        balance_summary = process_transactions(tx_list)
+        total_balance = balance_summary.get(addr, 0.0)
+        organized[addr] = {
+            "balance": total_balance,
+            "transaction_count": len(tx_list),
+            "cleaned_address": addr
+        }
+    return organized
 
-        execution_time = time.perf_counter() - start_time
-        print(f"Processed {len(optimized_results)} items in {execution_time:.6f}s")
-        
-        return optimized_results
-
-    def clear_cache(self) -> None:
-        """Clear internal LRU cache to free crypto session memory."""
-        self._validate_checksum.cache_clear()
+# Example usage for testing the processor
+if __name__ == "__main__":
+    sample_raw_data = [
+        {
+            "address": " 0x742d35Cc6634C0532925a3b844Bc454e4438f44e ",
+            "transactions": [
+                {"from": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "to": "0x1234567890123456789012345678901234567890", "amount": 2.5},
+                {"from": "0x1234567890123456789012345678901234567890", "to": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "amount": 1.0}
+            ]
+        }
+    ]
+    result = reorganize_wallet_data(sample_raw_data)
+    print(json.dumps(result, indent=2))
