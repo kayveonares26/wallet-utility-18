@@ -1,54 +1,54 @@
-import json
-import os
-from typing import Dict, Any, Optional
+"""Performance optimized constants for crypto wallet utility."""
+import functools
+from typing import Dict, Optional
 
-# Default configuration values for wallet-utility-18
-DEFAULTS = {
-    "network": "mainnet",
-    "rpc_url": "https://mainnet.example.com",
-    "api_key": None,
-    "timeout": 30,
-    "max_retries": 3,
-    "log_level": "INFO",
-    "wallet_dir": "./wallets",
-    "confirmations_required": 1,
+SUPPORTED_CHAINS: Dict[str, int] = {
+    "ethereum": 1,
+    "bitcoin": 0,
+    "binance": 56,
+    "polygon": 137,
+    "arbitrum": 42161,
 }
 
-def load_configuration(config_file: Optional[str] = None) -> Dict[str, Any]:
-    """Load configuration with defaults, overriding from file and environment."""
-    config = DEFAULTS.copy()
+DEFAULT_GAS_PRICES: Dict[str, int] = {
+    "ethereum": 20000000000,
+    "polygon": 30000000000,
+    "binance": 5000000000,
+}
 
-    # Load from file if provided and exists
-    if config_file and os.path.exists(config_file):
-        try:
-            with open(config_file, "r") as f:
-                file_config = json.load(f)
-                if isinstance(file_config, dict):
-                    config.update(file_config)
-        except (json.JSONDecodeError, IOError) as e:
-            # In production would log, but for now ignore or print
-            print(f"Warning: Could not load config file: {e}")
+TOKEN_DECIMALS: Dict[str, int] = {
+    "ETH": 18,
+    "BTC": 8,
+    "USDT": 6,
+    "USDC": 6,
+}
 
-    # Override with environment variables
-    for key in list(config.keys()):
-        env_key = f"WALLET_{key.upper()}"
-        if env_key in os.environ:
-            value = os.environ[env_key]
-            # Try to convert to original type if possible
-            original = config[key]
-            if isinstance(original, int):
-                try:
-                    config[key] = int(value)
-                except ValueError:
-                    pass
-            elif isinstance(original, bool):
-                config[key] = value.lower() in ("true", "1", "yes")
-            else:
-                config[key] = value
+@functools.lru_cache(maxsize=128)
+def get_chain_id(chain: str) -> Optional[int]:
+    return SUPPORTED_CHAINS.get(chain.lower())
 
-    return config
+@functools.lru_cache(maxsize=128)
+def get_gas_price(chain: str) -> Optional[int]:
+    return DEFAULT_GAS_PRICES.get(chain.lower())
 
-# Example usage
-if __name__ == "__main__":
-    cfg = load_configuration("wallet_config.json")
-    print("Loaded config:", cfg)
+@functools.lru_cache(maxsize=128)
+def get_token_decimals(token: str) -> Optional[int]:
+    return TOKEN_DECIMALS.get(token.upper())
+
+class WalletConstants:
+    __slots__ = ('chains', 'gas_prices', 'decimals')
+    def __init__(self):
+        self.chains = SUPPORTED_CHAINS
+        self.gas_prices = DEFAULT_GAS_PRICES
+        self.decimals = TOKEN_DECIMALS
+    def get_chain_id(self, chain: str) -> Optional[int]:
+        return self.chains.get(chain.lower())
+    def get_gas_price(self, chain: str) -> Optional[int]:
+        return self.gas_prices.get(chain.lower())
+    def get_decimals(self, token: str) -> Optional[int]:
+        return self.decimals.get(token.upper())
+    def convert_to_base_unit(self, amount: float, token: str) -> int:
+        dec = self.get_decimals(token) or 18
+        return int(amount * (10 ** dec))
+
+WALLET_CONSTANTS = WalletConstants()
