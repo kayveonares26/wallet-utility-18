@@ -1,33 +1,54 @@
-"""
-Global constants for wallet-utility-18.
-Handles network configurations and transaction limits.
-"""
+import json
+import os
+from typing import Dict, Any, Optional
 
-# Network identifiers
-NETWORKS = {
-    "mainnet": "https://api.mainnet.crypto.org",
-    "testnet": "https://api.testnet.crypto.org",
-    "devnet": "http://localhost:8545"
+# Default configuration values for wallet-utility-18
+DEFAULTS = {
+    "network": "mainnet",
+    "rpc_url": "https://mainnet.example.com",
+    "api_key": None,
+    "timeout": 30,
+    "max_retries": 3,
+    "log_level": "INFO",
+    "wallet_dir": "./wallets",
+    "confirmations_required": 1,
 }
 
-# Supported cryptocurrency ticker symbols
-SUPPORTED_CURRENCIES = [
-    "BTC",
-    "ETH",
-    "USDT",
-    "SOL",
-    "ADA"
-]
+def load_configuration(config_file: Optional[str] = None) -> Dict[str, Any]:
+    """Load configuration with defaults, overriding from file and environment."""
+    config = DEFAULTS.copy()
 
-# Transaction safety limits
-MAX_TRANSACTION_FEE_GWEI = 500
-MIN_CONFIRMATIONS_REQUIRED = 3
+    # Load from file if provided and exists
+    if config_file and os.path.exists(config_file):
+        try:
+            with open(config_file, "r") as f:
+                file_config = json.load(f)
+                if isinstance(file_config, dict):
+                    config.update(file_config)
+        except (json.JSONDecodeError, IOError) as e:
+            # In production would log, but for now ignore or print
+            print(f"Warning: Could not load config file: {e}")
 
-# Gas estimation parameters
-DEFAULT_GAS_LIMIT = 21000
-GAS_BUFFER_PERCENTAGE = 10
+    # Override with environment variables
+    for key in list(config.keys()):
+        env_key = f"WALLET_{key.upper()}"
+        if env_key in os.environ:
+            value = os.environ[env_key]
+            # Try to convert to original type if possible
+            original = config[key]
+            if isinstance(original, int):
+                try:
+                    config[key] = int(value)
+                except ValueError:
+                    pass
+            elif isinstance(original, bool):
+                config[key] = value.lower() in ("true", "1", "yes")
+            else:
+                config[key] = value
 
-# Error message strings
-ERR_INVALID_ADDRESS = "Invalid wallet address format provided."
-ERR_INSUFFICIENT_FUNDS = "Insufficient balance to cover transaction and fees."
-ERR_NETWORK_TIMEOUT = "Connection to the crypto network timed out."
+    return config
+
+# Example usage
+if __name__ == "__main__":
+    cfg = load_configuration("wallet_config.json")
+    print("Loaded config:", cfg)
