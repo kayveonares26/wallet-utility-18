@@ -1,52 +1,56 @@
 import re
 
-def validate_wallet_address(address):
-    """Validate Ethereum-style wallet address."""
+def is_valid_ethereum_address(address: str) -> bool:
+    """Validate Ethereum address format."""
     if not isinstance(address, str):
         return False
-    # Check for 0x prefix and 40 hexadecimal characters
-    pattern = r'^0x[a-fA-F0-9]{40}$'
-    return bool(re.match(pattern, address))
-
-def validate_amount(amount):
-    """Validate positive transaction amount."""
-    if not isinstance(amount, (int, float, str)):
+    # Strip 0x prefix
+    if address.lower().startswith('0x'):
+        address = address[2:]
+    # Must be 40 hex characters
+    if len(address) != 40:
         return False
-    try:
-        value = float(amount)
-        return value > 0
-    except (ValueError, TypeError):
-        return False
+    return bool(re.match(r'^[0-9a-fA-F]{40}$', address))
 
-def validate_transaction(tx):
-    """Validate transaction input data."""
-    if not isinstance(tx, dict):
+def is_valid_bitcoin_address(address: str) -> bool:
+    """Basic validation for common Bitcoin address formats."""
+    if not isinstance(address, str) or not address:
         return False
-    if 'address' not in tx or 'amount' not in tx:
+    # P2PKH starts with 1, P2SH with 3, Bech32 with bc1
+    if re.match(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$', address):
+        return True
+    if re.match(r'^bc1[a-z0-9]{39,59}$', address.lower()):
+        return True
+    return False
+
+def is_valid_private_key(private_key: str) -> bool:
+    """Validate hex private key for 256-bit key."""
+    if not isinstance(private_key, str):
         return False
-    return (validate_wallet_address(tx['address']) and 
-            validate_amount(tx['amount']))
+    if private_key.lower().startswith('0x'):
+        private_key = private_key[2:]
+    if len(private_key) != 64:
+        return False
+    return bool(re.match(r'^[0-9a-fA-F]{64}$', private_key))
 
-def main_processing_loop(transactions):
-    """Main processing loop with input validation."""
-    valid_count = 0
-    invalid_count = 0
-    for tx in transactions:
-        if validate_transaction(tx):
-            # Process the valid transaction
-            print(f"Processing tx: address={tx['address']}, amount={tx['amount']}")
-            valid_count += 1
-        else:
-            print(f"Skipping invalid input: {tx}")
-            invalid_count += 1
-    print(f"Summary: {valid_count} valid, {invalid_count} invalid")
-    return valid_count, invalid_count
+def validate_transaction_hash(tx_hash: str) -> bool:
+    """Check if string is valid transaction hash."""
+    if not isinstance(tx_hash, str):
+        return False
+    if tx_hash.lower().startswith('0x'):
+        tx_hash = tx_hash[2:]
+    if len(tx_hash) != 64:
+        return False
+    return bool(re.match(r'^[0-9a-fA-F]{64}$', tx_hash))
 
-if __name__ == "__main__":
-    samples = [
-        {"address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "amount": "100.5"},
-        {"address": "0x1234567890123456789012345678901234567890", "amount": "0"},
-        {"address": "invalidaddress", "amount": "50"},
-        {"address": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", "amount": 25},
-    ]
-    main_processing_loop(samples)
+def is_positive_amount(amount: float) -> bool:
+    """Ensure amount is positive number."""
+    if not isinstance(amount, (int, float)):
+        return False
+    return amount > 0
+
+def validate_wallet_balance(balance: float, required: float) -> bool:
+    """Check if balance is sufficient."""
+    if not isinstance(balance, (int, float)) or not isinstance(required, (int, float)):
+        return False
+    return balance >= required
