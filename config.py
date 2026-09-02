@@ -2,60 +2,76 @@ import os
 import json
 from typing import Any, Dict, Optional
 
-DEFAULTS = {
-    "network": "mainnet",
-    "rpc_url": "https://mainnet.infura.io/v3/YOUR_PROJECT_ID",
-    "chain_id": 1,
-    "gas_price_gwei": 20,
-    "timeout": 30,
-    "max_retries": 3,
-    "log_level": "INFO",
-    "wallet_dir": "./data/wallets",
-    "use_encryption": True,
-    "api_key": ""
-}
+class ConfigLoader:
+    """Configuration loader with defaults for crypto wallet utility."""
 
-class ConfigurationLoader:
-    """Loads wallet configuration using defaults, JSON file and environment variables."""
+    DEFAULTS: Dict[str, Any] = {
+        "network": "mainnet",
+        "rpc_endpoint": "https://mainnet.infura.io/v3/",
+        "timeout_seconds": 30,
+        "retry_count": 3,
+        "log_level": "INFO",
+        "storage_path": "./data/wallets",
+        "gas_limit": 21000,
+    }
 
     def __init__(self, config_path: Optional[str] = None) -> None:
-        self.config_path = config_path or os.getenv("WALLET_UTILITY_CONFIG", "config.json")
-        self.config: Dict[str, Any] = DEFAULTS.copy()
-        self._load_from_file()
-        self._apply_environment_overrides()
+        """Initialize the configuration loader."""
+        self.config_path = config_path or "config.json"
+        self._config: Dict[str, Any] = self._load()
 
-    def _load_from_file(self) -> None:
-        """Load and merge config from JSON file if present."""
+    def _load(self) -> Dict[str, Any]:
+        """Load configuration merging defaults, file and environment."""
+        config = self.DEFAULTS.copy()
+
+        # Load from file if it exists
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
-                    file_config = json.load(f)
-                if isinstance(file_config, dict):
-                    self.config.update(file_config)
+                    file_data = json.load(f)
+                    if isinstance(file_data, dict):
+                        config.update(file_data)
             except (json.JSONDecodeError, OSError):
+                # Ignore invalid file, use defaults
                 pass
 
-    def _apply_environment_overrides(self) -> None:
-        """Apply overrides from environment variables prefixed with WALLET_."""
-        prefix = "WALLET_"
-        for key, default_value in DEFAULTS.items():
-            env_var = prefix + key.upper()
-            if env_var in os.environ:
-                env_value = os.environ[env_var]
-                if isinstance(default_value, bool):
-                    self.config[key] = env_value.lower() in ("true", "1", "yes", "on")
-                elif isinstance(default_value, int):
-                    try:
-                        self.config[key] = int(env_value)
-                    except ValueError:
-                        self.config[key] = default_value
+        # Apply environment variable overrides
+        for key in self.DEFAULTS:
+            env_name = f"WALLET_UTILITY_{key.upper()}"
+            if env_name in os.environ:
+                env_value = os.environ[env_name]
+                # Simple type conversion
+                if env_value.isdigit():
+                    config[key] = int(env_value)
+                elif env_value.lower() in ("true", "false"):
+                    config[key] = env_value.lower() == "true"
                 else:
-                    self.config[key] = env_value
+                    config[key] = env_value
 
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Retrieve configuration value or default."""
-        return self.config.get(key, default)
+        return config
 
-    def get_all(self) -> Dict[str, Any]:
-        """Return a copy of the full configuration."""
-        return self.config.copy()
+    def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve a configuration value."""
+        return self._config.get(key, default)
+
+    def update(self, updates: Dict[str, Any]) -> None:
+        """Update config values in memory."""
+        self._config.update(updates)
+
+    def save(self) -> bool:
+        """Persist current config to the file."""
+        try:
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(self._config, f, indent=4)
+            return True
+        except OSError:
+            return False
+
+    def __str__(self) -> str:
+        return str(self._config)
+
+
+def create_default_config(path: str = "config.json") -> None:
+    """Create a config file with default values."""
+    loader = ConfigLoader(path)
+    loader.save()
