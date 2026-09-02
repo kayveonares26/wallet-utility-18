@@ -1,52 +1,34 @@
-# Wallet Utility 18
+# wallet-utility-18
 
-Wallet Utility 18 is a versatile Python library designed for seamless interaction with various cryptocurrency wallets. It simplifies essential wallet functions, making it easier to manage digital assets and automate transactions.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+wallet-utility-18 is a Python command-line tool for cryptocurrency wallet operations. It handles mnemonic generation, address derivation, and transaction signing for Bitcoin and Ethereum without requiring external services.
 
 ## Features
-
-- **Multi-Currency Support**: Interact with popular cryptocurrencies like Bitcoin, Ethereum, and Litecoin through a unified interface.
-- **Secure Transaction Management**: Easily create, sign, and broadcast transactions while maintaining the highest security standards.
-- **Real-Time Balance Monitoring**: Effortlessly check wallet balances and transaction histories with live data from blockchain APIs.
-- **User-Friendly API**: Designed with simplicity in mind, enabling developers to integrate cryptocurrency wallet functionalities into their applications quickly.
+- Generate BIP39 mnemonics and derive addresses using standard BIP44 paths for Bitcoin and Ethereum
+- Sign Ethereum transactions and personal messages from raw inputs
+- Import existing seeds or private keys and export data in JSON or WIF formats
+- Validate addresses and derive multiple child keys in a single operation
 
 ## Installation
 
-To install the Wallet Utility 18 library, you'll need to have Python 3.7 or higher. You can quickly install the package using pip:
+```bash
+git clone https://github.com/Developer/wallet-utility-18.git
+cd wallet-utility-18
+pip install -r requirements.txt
+pip install -e .
+```
+
+## Usage
+
+Generate a new Ethereum wallet:
 
 ```bash
-pip install wallet-utility-18
+wallet-utility generate --coin eth
 ```
 
-## Basic Usage Example
+Sign a transaction:
 
-Here's a simple example demonstrating how to create a wallet, check its balance, and send a transaction:
-
-```python
-from wallet_utility import Wallet
-
-# Create a new wallet
-my_wallet = Wallet.create_wallet('my_secure_password')
-
-# Check balance
-balance = my_wallet.get_balance()
-print(f"Wallet balance: {balance} BTC")
-
-# Send a transaction
-recipient_address = "recipient_wallet_address"
-amount = 0.001  # Amount in BTC
-try:
-    transaction_id = my_wallet.send_transaction(recipient_address, amount)
-    print(f"Transaction successful! ID: {transaction_id}")
-except Exception as e:
-    print(f"Error sending transaction: {e}")
+```bash
+wallet-utility sign-tx --network ethereum --private-key <key> --to 0x... --value 0.01
 ```
-
-## License
-
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
----
-
-For more information and contributions, please visit the [GitHub repository](https://github.com/developer/wallet-utility-18). Join the community in exploring the future of cryptocurrency management!
