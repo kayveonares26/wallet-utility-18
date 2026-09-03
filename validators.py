@@ -1,41 +1,78 @@
 import re
-from functools import lru_cache
-from typing import List, Dict, Optional
+from decimal import Decimal, InvalidOperation
+from typing import Union
 
-# Pre-compiled regex patterns for fast matching across calls
-ETH_REGEX = re.compile('^0x[a-fA-F0-9]{40}$')
-BTC_REGEX = re.compile('^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$')
-SOL_REGEX = re.compile('^[1-9A-HJ-NP-Za-km-z]{32,44}$')
+ETH_ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
+HEX_STR_REGEX = re.compile(r"^0x[a-fA-F0-9]+$")
 
-CHAIN_VALIDATORS = {
-    'eth': ETH_REGEX,
-    'btc': BTC_REGEX,
-    'sol': SOL_REGEX
-}
 
-@lru_cache(maxsize=512)
-def is_valid_address(address: str, chain: str = 'eth') -> bool:
+class WalletValidationError(Exception):
+    """Raised when wallet input or transaction parameter fails validation."""
+
+    pass
+
+
+def validate_crypto_address(address: str) -> str:
+    """Validate EVM address structure and handle edge cases like whitespace and formatting."""
     if not isinstance(address, str):
-        return False
-    regex = CHAIN_VALIDATORS.get(chain)
-    if regex is None:
-        return False
-    return bool(regex.match(address))
+        raise WalletValidationError("Address must be a string instance")
 
-def batch_validate(addresses: List[str], chain: str = 'eth') -> Dict[str, bool]:
-    '''Batch validation for improved performance on multiple addresses.'''
-    return {address: is_valid_address(address, chain) for address in addresses}
+    cleaned = address.strip()
+    if not cleaned:
+        raise WalletValidationError("Address cannot be empty or whitespace")
 
-def filter_valid(addresses: List[str], chain: str = 'eth') -> List[str]:
-    return [a for a in addresses if is_valid_address(a, chain)]
+    if not ETH_ADDRESS_REGEX.match(cleaned):
+        raise WalletValidationError(f"Invalid EVM address format: '{address}'")
 
-def detect_chain(address: str) -> Optional[str]:
-    if not isinstance(address, str):
-        return None
-    if address.startswith('0x') and len(address) == 42:
-        return 'eth'
-    elif address[0] in ('1', '3') and 26 <= len(address) <= 35:
-        return 'btc'
-    elif 32 <= len(address) <= 44:
-        return 'sol'
-    return None
+    return cleaned
+
+
+def validate_transaction_amount(
+    amount: Union[str, int, float],
+    max_supply: int = 10**8,
+) -> Decimal:
+    """Parse and validate transaction amounts preventing floating point precision loss and overflow."""
+    if amount is None:
+        raise WalletValidationError("Amount cannot be None")
+
+    try:
+        # Prevent float precision truncation by coercing through precise string conversion
+        str_val = str(amount) if not isinstance(amount, float) else f"{amount:.18f}"
+        dec_amount = Decimal(str_val)
+    except (InvalidOperation, TypeError, ValueError) as err:
+        raise WalletValidationError(f"Invalid numeric format for transaction amount: {amount}") from err
+
+    if dec_amount.is_nan() or dec_amount.is_infinite():
+        raise WalletValidationError("Transaction amount cannot be NaN or Infinite")
+
+    if dec_amount <= Decimal("0"):
+        raise WalletValidationError("Transaction amount must be strictly greater than zero")
+
+    if dec_amount > Decimal(max_supply):
+        raise WalletValidationError(f"Amount exceeds maximum safety limit of {max_supply}")
+
+    return dec_amount
+
+
+def validate_hex_payload(payload: str, max_bytes: int = 131072) -> bytes:
+    """Validate hex payload encoding, parity, and length boundaries."""
+    if not isinstance(payload, str):
+        raise WalletValidationError("Payload must be a hexadecimal string")
+
+    cleaned = payload.strip()
+    if not cleaned.startswith("0x") or not HEX_STR_REGEX.match(cleaned):
+        raise WalletValidationError("Payload must be a valid 0x-prefixed hex string")
+
+    clean_hex = cleaned[2:]
+    if len(clean_hex) % 2 != 0:
+        raise WalletValidationError("Hex payload contains an invalid odd number of characters")
+
+    try:
+        byte_data = bytes.fromhex(clean_hex)
+    except ValueError as err:
+        raise WalletValidationError("Failed to decode byte sequence from hex input") from err
+
+    if len(byte_data) > max_bytes:
+        raise WalletValidationError(f"Payload size ({len(byte_data)} bytes) exceeds max limit ({max_bytes} bytes)")
+
+    return byte_data
