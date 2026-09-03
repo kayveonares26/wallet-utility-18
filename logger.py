@@ -1,18 +1,36 @@
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 
-# Logger setup function
+def setup_logger(name='wallet_logger', log_file='wallet.log'):
+    """Initializes a rotating file logger for crypto operations."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
 
-def setup_logger(log_file, max_bytes=5 * 1024 * 1024, backup_count=3):
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    handler = RotatingFileHandler(log_file, maxBytes=max_bytes, backupCount=backup_count)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Prevent duplicate handlers if re-initialized
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    # Log format with timestamp and severity
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+    # Rotation: 5MB per file, keep 3 backups
+    handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=5*1024*1024, 
+        backupCount=3
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
+    # Console output for visibility
+    console = logging.StreamHandler()
+    console.setFormatter(formatter)
+    logger.addHandler(console)
+
     return logger
 
-# Example usage
-if __name__ == '__main__':
-    log = setup_logger('app.log')
-    log.info('Logger has been set up successfully!')
+# Global logger instance for wallet-utility-18
+logger = setup_logger()
