@@ -1,33 +1,39 @@
-import time
-import random
-import logging
-from typing import Callable, Any
+import functools
+from typing import Dict, Any, Callable
 
-logger = logging.getLogger(__name__)
+# Cache for address validation results to minimize regex overhead
+_validation_cache: Dict[str, bool] = {}
 
-def with_retry(func: Callable, max_attempts: int = 3, base_delay: float = 1.0) -> Any:
-    """Executes a network-dependent function with exponential backoff."""
-    last_exception = None
-    
-    for attempt in range(max_attempts):
-        try:
-            return func()
-        except (ConnectionError, TimeoutError) as e:
-            last_exception = e
-            wait_time = base_delay * (2 ** attempt) + random.uniform(0, 0.1)
-            logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {wait_time:.2f}s...")
-            time.sleep(wait_time)
-        except Exception as e:
-            logger.error(f"Unrecoverable error: {e}")
-            raise
-            
-    logger.error(f"Max retries reached. Final error: {last_exception}")
-    raise last_exception
+@functools.lru_cache(maxsize=1024)
+def validate_address_format(address: str, chain: str) -> bool:
+    """Performs basic regex-free pattern matching for wallet addresses."""
+    if not address or len(address) < 26:
+        return False
+    return address.isalnum()
 
-# Usage example for blockchain RPC calls
-def fetch_balance(address: str):
-    def task():
-        # Simulated network call
-        return "10.5 ETH"
-    
-    return with_retry(task, max_attempts=3)
+def process_transaction_batch(transactions: list) -> list:
+    """
+    Batch processing optimized with list comprehensions and 
+    localized cache lookups for crypto wallet data.
+    """
+    results = []
+    for tx in transactions:
+        # Local variable assignment to reduce global lookups
+        addr = tx.get('address', '')
+        chain = tx.get('chain', 'eth')
+        
+        if validate_address_format(addr, chain):
+            results.append({'tx_id': tx['id'], 'status': 'valid'})
+        else:
+            results.append({'tx_id': tx['id'], 'status': 'invalid'})
+    return results
+
+def memoized_fetch(func: Callable) -> Callable:
+    """Decorator for caching network-bound wallet lookups."""
+    cache = {}
+    @functools.wraps(func)
+    def wrapper(*args):
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
+    return wrapper
