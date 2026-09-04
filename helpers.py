@@ -1,54 +1,41 @@
-import hashlib
-import functools
-from typing import List, Dict, Set
+from decimal import Decimal, getcontext
+import re
+from typing import Union
 
-@functools.lru_cache(maxsize=512)
-def _hash_data(data: str) -> str:
-    """Compute SHA256 hash with caching for performance"""
-    return hashlib.sha256(data.encode('utf-8')).hexdigest()
+# Set high precision for crypto calculations
+getcontext().prec = 28
 
-def derive_address(seed: str, path: str) -> str:
-    """Derive wallet address from seed and derivation path"""
-    combined = f"{seed}{path}"
-    hash_val = _hash_data(combined)
-    return "0x" + hash_val[:40]
+ETH_DECIMALS = 18
+BTC_DECIMALS = 8
 
-def batch_derive_addresses(seeds: List[str], paths: List[str]) -> Dict[str, str]:
-    """Batch derive addresses efficiently using cached hashes"""
-    addresses = {}
-    for seed in seeds:
-        for path in paths:
-            key = f"{seed}:{path}"
-            addresses[key] = derive_address(seed, path)
-    return addresses
+def wei_to_ether(wei: int) -> Decimal:
+    '''Convert Wei (int) to Ether (Decimal).'''
+    if not isinstance(wei, int) or wei < 0:
+        raise ValueError('Wei value must be a non-negative integer.')
+    return Decimal(wei) / Decimal(10 ** ETH_DECIMALS)
 
-def filter_unique_addresses(addresses: List[str]) -> Set[str]:
-    """Use set for O(1) lookups and deduplication"""
-    return set(addresses)
+def ether_to_wei(ether: Union[Decimal, float, str, int]) -> int:
+    '''Convert Ether to Wei (int) accurately using Decimal.'''
+    ether_dec = Decimal(str(ether))
+    if ether_dec < 0:
+        raise ValueError('Ether value must be non-negative.')
+    return int(ether_dec * Decimal(10 ** ETH_DECIMALS))
 
-def compute_total_balance(balances: Dict[str, float]) -> float:
-    """Optimized balance summation"""
-    return sum(balances.values())
+def satoshi_to_btc(satoshi: int) -> Decimal:
+    '''Convert Satoshi (int) to BTC (Decimal).'''
+    if not isinstance(satoshi, int) or satoshi < 0:
+        raise ValueError('Satoshi value must be a non-negative integer.')
+    return Decimal(satoshi) / Decimal(10 ** BTC_DECIMALS)
 
-def validate_and_cache(addresses: List[str]) -> List[str]:
-    """Validate list of addresses"""
-    valid = []
-    for addr in addresses:
-        if len(addr) == 42 and addr.startswith("0x"):
-            try:
-                int(addr[2:], 16)
-                valid.append(addr)
-            except:
-                pass
-    return valid
+def btc_to_satoshi(btc: Union[Decimal, float, str, int]) -> int:
+    '''Convert BTC to Satoshi (int) accurately using Decimal.'''
+    btc_dec = Decimal(str(btc))
+    if btc_dec < 0:
+        raise ValueError('BTC value must be non-negative.')
+    return int(btc_dec * Decimal(10 ** BTC_DECIMALS))
 
-def optimize_transaction_list(transactions: List[Dict]) -> List[Dict]:
-    """Sort and dedup transactions for performance"""
-    seen = set()
-    unique = []
-    for tx in sorted(transactions, key=lambda x: x.get('timestamp', 0)):
-        tx_id = tx.get('id')
-        if tx_id and tx_id not in seen:
-            seen.add(tx_id)
-            unique.append(tx)
-    return unique
+def validate_ethereum_address(address: str) -> bool:
+    '''Validate Ethereum hex address pattern.'''
+    if not isinstance(address, str):
+        return False
+    return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
