@@ -1,35 +1,34 @@
 import time
-import functools
 import logging
-from typing import Callable, Any, Type
+from functools import wraps
+from typing import Callable, Any, Type, Tuple
 
-logger = logging.getLogger("wallet-utility-18")
+logger = logging.getLogger("wallet_utility.utils")
 
-def retry_operation(
-    max_attempts: int = 3,
-    delay_seconds: float = 1.0,
+def retry_on_failure(
+    retries: int = 3,
     backoff_factor: float = 2.0,
-    exceptions: tuple[Type[Exception], ...] = (Exception,)
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,)
 ) -> Callable:
-    """Decorator implementing exponential backoff for network operations."""
+    """
+    Decorator to retry a function call with exponential backoff.
+    """
     def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
+        @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            current_delay = delay_seconds
-            attempt = 1
-            
-            while attempt <= max_attempts:
+            delay = 1.0
+            for attempt in range(1, retries + 1):
                 try:
                     return func(*args, **kwargs)
                 except exceptions as e:
-                    if attempt == max_attempts:
-                        logger.error(f"Operation {func.__name__} failed after {max_attempts} attempts. Error: {e}")
+                    if attempt == retries:
+                        logger.error(f"Failed {func.__name__} after {retries} attempts: {e}")
                         raise
-                    
-                    logger.warning(f"Attempt {attempt} for {func.__name__} failed: {e}. Retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff_factor
-                    attempt += 1
-                    
+                    logger.warning(
+                        f"Attempt {attempt}/{retries} failed for {func.__name__}: {e}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                    delay *= backoff_factor
         return wrapper
     return decorator
