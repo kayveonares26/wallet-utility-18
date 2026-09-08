@@ -1,29 +1,38 @@
-import os
-from typing import Final
+from enum import Enum
+from typing import Dict, Final
 
-# Network identifiers
-MAINNET: Final[str] = 'mainnet'
-TESTNET: Final[str] = 'testnet'
+class CryptoNetwork(Enum):
+    BITCOIN = "BTC"
+    ETHEREUM = "ETH"
+    SOLANA = "SOL"
 
-# Default connection settings
-DEFAULT_TIMEOUT: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
+# Standard precision mapping for crypto assets
+ASSET_PRECISION: Final[Dict[str, int]] = {
+    "BTC": 8,
+    "ETH": 18,
+    "SOL": 9,
+    "USDC": 6,
+    "USDT": 6
+}
 
-# Wallet storage configuration
-STORAGE_DIR: Final[str] = os.getenv('WALLET_DATA_DIR', './data')
-KEYSTORE_PATH: Final[str] = os.path.join(STORAGE_DIR, 'keystore.json')
+# Network-specific explorer endpoints
+EXPLORER_URLS: Final[Dict[CryptoNetwork, str]] = {
+    CryptoNetwork.BITCOIN: "https://blockstream.info",
+    CryptoNetwork.ETHEREUM: "https://etherscan.io",
+    CryptoNetwork.SOLANA: "https://explorer.solana.com"
+}
 
-# API limits and pricing
-RATE_LIMIT_PER_MINUTE: Final[int] = 60
-GAS_PRICE_DEFAULT: Final[int] = 20000000000
+# Transaction confirmation thresholds
+MIN_CONFIRMATIONS: Final[Dict[CryptoNetwork, int]] = {
+    CryptoNetwork.BITCOIN: 2,
+    CryptoNetwork.ETHEREUM: 12,
+    CryptoNetwork.SOLANA: 1
+}
 
-# Supported protocols
-SUPPORTED_NETWORKS: Final[tuple] = (MAINNET, TESTNET)
+def get_precision(symbol: str) -> int:
+    """Return the decimal precision for a given ticker."""
+    return ASSET_PRECISION.get(symbol.upper(), 8)
 
-# Encryption settings
-KDF_ITERATIONS: Final[int] = 262144
-ALGORITHM: Final[str] = 'aes-256-gcm'
-
-# Logging configuration
-LOG_LEVEL: Final[str] = 'INFO'
-LOG_FORMAT: Final[str] = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+def is_supported(network: str) -> bool:
+    """Check if the provided network is supported."""
+    return network.upper() in [n.value for n in CryptoNetwork]
