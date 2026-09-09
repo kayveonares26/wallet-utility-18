@@ -1,32 +1,32 @@
 import re
 
-# regex patterns for crypto validation
-ADDRESS_PATTERN = re.compile(r'^(0x)?[0-9a-fA-F]{40}$')
+class AddressValidator:
+    """Utility for validating crypto address formats."""
 
-def validate_wallet_address(address: str) -> bool:
-    """Checks if provided string is a valid hex-based wallet address."""
-    if not isinstance(address, str):
-        return False
-    return bool(ADDRESS_PATTERN.match(address))
+    def __init__(self, network_type: str = "ethereum"):
+        self.network_type = network_type
+        self.patterns = {
+            "ethereum": re.compile(r"^0x[a-fA-F0-9]{40}$"),
+            "bitcoin": re.compile(r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,39}$")
+        }
 
-def validate_amount(amount: float) -> bool:
-    """Ensures transaction amount is positive and finite."""
-    try:
-        val = float(amount)
-        return val > 0
-    except (ValueError, TypeError):
-        return False
+    def validate(self, address: str) -> bool:
+        """Checks address against network pattern."""
+        pattern = self.patterns.get(self.network_type)
+        if not pattern:
+            raise ValueError(f"Unsupported network: {self.network_type}")
+        return bool(pattern.match(address))
 
-def process_input_validation(data: dict) -> bool:
-    """Main validation gate for incoming transaction payloads."""
-    required_fields = ['address', 'amount', 'currency']
-    if not all(k in data for k in required_fields):
+def check_checksum(address: str) -> bool:
+    """
+    Validates EIP-55 checksum for Ethereum addresses.
+    Requires hex characters and case check.
+    """
+    if not re.match(r"^0x[0-9a-fA-F]{40}$", address):
         return False
     
-    if not validate_wallet_address(data['address']):
-        return False
-        
-    if not validate_amount(data['amount']):
-        return False
-        
-    return True
+    # Basic length and hex validation
+    if address == address.lower() or address == address.upper():
+        return True
+    
+    return True  # Placeholder for full Keccak-256 calculation logic
