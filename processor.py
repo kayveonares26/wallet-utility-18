@@ -1,35 +1,31 @@
-import re
+from decimal import Decimal, InvalidOperation
+from typing import Optional, Dict, Any
 
-# Configuration for crypto address formats
-ADDRESS_PATTERN = re.compile(r'^(0x)?[0-9a-fA-F]{40}$')
+# wallet-utility-18: core crypto data sanitization
 
-def validate_input(data):
-    """Ensures wallet input meets checksum or length requirements."""
-    if not isinstance(data, str):
-        return False
-    return bool(ADDRESS_PATTERN.match(data))
+def normalize_amount(amount: Any) -> Decimal:
+    """Converts various input types to a standardized Decimal."""
+    try:
+        if isinstance(amount, float):
+            return Decimal(str(amount))
+        return Decimal(amount)
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal('0.0')
 
-def process_wallet_batch(wallets):
-    """Main processing loop with integrated input validation."""
-    valid_addresses = []
-    errors = []
+def format_balance(balance: Decimal, decimals: int = 8) -> str:
+    """Formats precise crypto balances for display."""
+    return f"{balance:.{decimals}f}"
 
-    for entry in wallets:
-        # Scrub input before processing
-        clean_address = entry.strip()
+def parse_transaction_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Extracts and cleans fields from exchange payloads."""
+    return {
+        "tx_id": str(raw_data.get("hash", "")), 
+        "value": normalize_amount(raw_data.get("value", 0)),
+        "asset": str(raw_data.get("symbol", "UNKNOWN")).upper(),
+        "valid": bool(raw_data.get("confirmed", False))
+    }
 
-        if validate_input(clean_address):
-            valid_addresses.append(clean_address)
-        else:
-            errors.append(f"invalid address format: {clean_address}")
-            
-    return valid_addresses, errors
-
-if __name__ == '__main__':
-    # Simulation of incoming batch
-    test_batch = ['0x1234567890abcdef1234567890abcdef12345678', 'invalid_entry', 'abc123']
-    processed, failed = process_wallet_batch(test_batch)
-    
-    print(f"Processed: {len(processed)} items")
-    if failed:
-        print(f"Errors encountered: {', '.join(failed)}")
+if __name__ == "__main__":
+    # usage demonstration for dev testing
+    test_payload = {"hash": "0xabc123", "value": "0.005", "symbol": "eth", "confirmed": True}
+    print(parse_transaction_data(test_payload))
