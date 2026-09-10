@@ -1,27 +1,31 @@
-import decimal
-from typing import Union
+import time
+import functools
+import logging
+from typing import Callable, Any
 
-def normalize_amount(amount: Union[str, float, int]) -> decimal.Decimal:
-    """Converts various input types to a standardized Decimal format."""
-    try:
-        return decimal.Decimal(str(amount)).quantize(decimal.Decimal('0.00000001'), rounding=decimal.ROUND_HALF_UP)
-    except (decimal.InvalidOperation, ValueError):
-        return decimal.Decimal('0.0')
+logger = logging.getLogger(__name__)
 
-def format_crypto_address(address: str) -> str:
-    """Sanitizes address strings by stripping whitespace and casing."""
-    if not address:
-        return ""
-    return address.strip().lower()
+def retry_network_call(max_retries: int = 3, delay: float = 1.0):
+    """Decorator to retry network-dependent functions on failure."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError) as e:
+                    last_exception = e
+                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                    time.sleep(delay)
+            
+            logger.error(f"Max retries reached. Final error: {last_exception}")
+            raise last_exception
+        return wrapper
+    return decorator
 
-def validate_fee_rate(fee_rate: float) -> bool:
-    """Checks if provided fee rate is within acceptable network bounds."""
-    MIN_FEE = 0.00000001
-    MAX_FEE = 0.1
-    return MIN_FEE <= fee_rate <= MAX_FEE
-
-def mask_private_key(key: str) -> str:
-    """Redacts sensitive key data for logging security."""
-    if len(key) < 8:
-        return "***"
-    return f"{key[:4]}...{key[-4:]}"
+@retry_network_call(max_retries=3, delay=2.0)
+def fetch_balance(address: str):
+    """Example of a network call for crypto balance."""
+    # Placeholder for actual network request logic
+    return 0.0
