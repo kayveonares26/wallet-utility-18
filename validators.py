@@ -1,32 +1,34 @@
 import re
 
-class AddressValidator:
-    """Utility for validating crypto address formats."""
+# Common crypto address and key patterns
+ETH_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
+BTC_ADDRESS_PATTERN = re.compile(
+    r"^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[ac-hj-np-z0-9]{11,71})$"
+)
+HEX_PRIVATE_KEY_PATTERN = re.compile(r"^[a-fA-F0-9]{64}$")
 
-    def __init__(self, network_type: str = "ethereum"):
-        self.network_type = network_type
-        self.patterns = {
-            "ethereum": re.compile(r"^0x[a-fA-F0-9]{40}$"),
-            "bitcoin": re.compile(r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,39}$")
-        }
-
-    def validate(self, address: str) -> bool:
-        """Checks address against network pattern."""
-        pattern = self.patterns.get(self.network_type)
-        if not pattern:
-            raise ValueError(f"Unsupported network: {self.network_type}")
-        return bool(pattern.match(address))
-
-def check_checksum(address: str) -> bool:
-    """
-    Validates EIP-55 checksum for Ethereum addresses.
-    Requires hex characters and case check.
-    """
-    if not re.match(r"^0x[0-9a-fA-F]{40}$", address):
+def is_valid_ethereum_address(address: str) -> bool:
+    """Validates standard Ethereum address format."""
+    if not isinstance(address, str):
         return False
-    
-    # Basic length and hex validation
-    if address == address.lower() or address == address.upper():
-        return True
-    
-    return True  # Placeholder for full Keccak-256 calculation logic
+    return bool(ETH_ADDRESS_PATTERN.match(address))
+
+def is_valid_bitcoin_address(address: str) -> bool:
+    """Validates basic Bitcoin address formats (Legacy, SegWit, Bech32)."""
+    if not isinstance(address, str):
+        return False
+    return bool(BTC_ADDRESS_PATTERN.match(address))
+
+def is_valid_hex_private_key(private_key: str) -> bool:
+    """Validates if a private key is a valid 64-character hex string."""
+    if not isinstance(private_key, str):
+        return False
+    clean_key = private_key[2:] if private_key.startswith("0x") else private_key
+    return bool(HEX_PRIVATE_KEY_PATTERN.match(clean_key))
+
+def is_valid_mnemonic_phrase(mnemonic: str) -> bool:
+    """Validates basic structure and word count of a BIP-39 mnemonic phrase."""
+    if not isinstance(mnemonic, str):
+        return False
+    words = mnemonic.strip().split()
+    return len(words) in {12, 15, 18, 21, 24}
