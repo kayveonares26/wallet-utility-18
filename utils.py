@@ -1,25 +1,41 @@
-import time
-import functools
-import logging
-from typing import Callable, Any
+import hashlib
+from typing import Optional
 
-logger = logging.getLogger(__name__)
+def generate_address_checksum(public_key_hex: str) -> str:
+    """
+    Generates a checksum for a given hex-encoded public key.
+    
+    Args:
+        public_key_hex: The hexadecimal string representation of the public key.
 
-def retry_network_op(retries: int = 3, backoff: float = 1.0):
-    """Decorator for retrying unstable network requests."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception = None
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    wait = backoff * (2 ** attempt)
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {wait}s...")
-                    time.sleep(wait)
-            logger.error(f"Final attempt failed for {func.__name__}")
-            raise last_exception
-        return wrapper
-    return decorator
+    Returns:
+        A string representing the checksummed address.
+    """
+    key_bytes = bytes.fromhex(public_key_hex)
+    hash_result = hashlib.sha256(key_bytes).hexdigest()
+    return f"0x{hash_result[:40]}"
+
+def validate_transaction_fee(fee_amount: float, minimum_fee: float = 0.0001) -> bool:
+    """
+    Checks if the provided transaction fee meets the minimum requirements.
+
+    Args:
+        fee_amount: The proposed fee to be paid for the transaction.
+        minimum_fee: The minimum required fee (default 0.0001).
+
+    Returns:
+        True if fee is acceptable, False otherwise.
+    """
+    return fee_amount >= minimum_fee
+
+def format_wei_to_eth(wei_value: int) -> float:
+    """
+    Converts a balance from Wei to Ether.
+
+    Args:
+        wei_value: The balance in Wei.
+
+    Returns:
+        The balance in Ether as a float.
+    """
+    return wei_value / 10**18
