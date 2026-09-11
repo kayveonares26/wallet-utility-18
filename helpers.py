@@ -1,31 +1,42 @@
-import time
-import functools
-import logging
-from typing import Callable, Any
+import re
+from typing import Union
 
-logger = logging.getLogger(__name__)
+SATOSHI_PER_BTC = 100_000_000
+WEI_PER_ETH = 10**18
 
-def retry_network_call(max_retries: int = 3, delay: float = 1.0):
-    """Decorator to retry network-dependent functions on failure."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception = None
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
-                    time.sleep(delay)
-            
-            logger.error(f"Max retries reached. Final error: {last_exception}")
-            raise last_exception
-        return wrapper
-    return decorator
 
-@retry_network_call(max_retries=3, delay=2.0)
-def fetch_balance(address: str):
-    """Example of a network call for crypto balance."""
-    # Placeholder for actual network request logic
-    return 0.0
+def satoshi_to_btc(satoshi: int) -> float:
+    """Convert Satoshi amount to Bitcoin (BTC)."""
+    if satoshi < 0:
+        raise ValueError("Satoshi amount cannot be negative")
+    return satoshi / SATOSHI_PER_BTC
+
+
+def btc_to_satoshi(btc: Union[int, float]) -> int:
+    """Convert Bitcoin (BTC) amount to Satoshi."""
+    if btc < 0:
+        raise ValueError("BTC amount cannot be negative")
+    return int(round(btc * SATOSHI_PER_BTC))
+
+
+def wei_to_eth(wei: int) -> float:
+    """Convert Wei amount to Ether (ETH)."""
+    if wei < 0:
+        raise ValueError("Wei amount cannot be negative")
+    return wei / WEI_PER_ETH
+
+
+def eth_to_wei(eth: Union[int, float]) -> int:
+    """Convert Ether (ETH) amount to Wei."""
+    if eth < 0:
+        raise ValueError("ETH amount cannot be negative")
+    return int(round(eth * WEI_PER_ETH))
+
+
+def format_address(address: str, prefix_len: int = 6, suffix_len: int = 4) -> str:
+    """Format wallet address for display (e.g., 0x1234...abcd)."""
+    if not address:
+        return ""
+    if len(address) <= prefix_len + suffix_len:
+        return address
+    return f"{address[:prefix_len]}...{address[-suffix_len:]}"
