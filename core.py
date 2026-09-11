@@ -1,32 +1,37 @@
-from typing import List, Dict, Optional
+import decimal
+from typing import Union
 
-class WalletManager:
-    def __init__(self, currency: str = "BTC") -> None:
-        """Initialize the wallet manager with a default currency."""
-        self.currency: str = currency
-        self.balances: Dict[str, float] = {}
+# Set precision for crypto calculations
+decimal.getcontext().prec = 18
 
-    def get_balance(self, address: str) -> float:
-        """Retrieve balance for a specific crypto address."""
-        return self.balances.get(address, 0.0)
+def format_crypto_amount(amount: Union[str, float, int], decimals: int = 8) -> str:
+    """
+    Normalizes crypto amounts to standard string representation.
+    Handles floating point issues by utilizing decimal library.
+    """
+    try:
+        d_amount = decimal.Decimal(str(amount))
+        # Truncate to desired decimal places without rounding
+        factor = decimal.Decimal(10) ** decimals
+        normalized = (d_amount * factor).to_integral_value(rounding=decimal.ROUND_DOWN) / factor
+        return f"{normalized:.{decimals}f}"
+    except (decimal.InvalidOperation, ValueError):
+        return "0.00000000"
 
-    def update_balance(self, address: str, amount: float) -> None:
-        """Update the balance for a given address."""
-        if amount < 0:
-            raise ValueError("Balance cannot be negative")
-        self.balances[address] = amount
+def calculate_fee(amount: str, fee_rate: float) -> str:
+    """
+    Computes transaction fee based on amount and rate.
+    Returns string for precision consistency.
+    """
+    amount_dec = decimal.Decimal(amount)
+    fee = amount_dec * decimal.Decimal(str(fee_rate))
+    return format_crypto_amount(fee)
 
-    def get_active_addresses(self) -> List[str]:
-        """Return a list of all addresses with positive balances."""
-        return [addr for addr, bal in self.balances.items() if bal > 0]
-
-    def calculate_total(self) -> float:
-        """Calculate the sum of all stored balances."""
-        return sum(self.balances.values())
-
-    def reset_wallet(self, address: Optional[str] = None) -> None:
-        """Clear balances for a specific address or all."""
-        if address:
-            self.balances.pop(address, None)
-        else:
-            self.balances.clear()
+def validate_address_format(address: str, chain_prefix: str = "0x") -> bool:
+    """
+    Basic hex-based address validation for evm chains.
+    """
+    if not address.startswith(chain_prefix):
+        return False
+    hex_part = address[len(chain_prefix):]
+    return len(hex_part) == 40 and all(c in "0123456789abcdefABCDEF" for c in hex_part)
