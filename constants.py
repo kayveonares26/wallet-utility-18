@@ -1,35 +1,28 @@
-import sys
-from typing import Final, Dict
+import os
+from typing import Dict
 
-# Network identifier constants for blockchain protocols
-# Using dictionary lookups for O(1) performance
-
-MAINNET_ID: Final[str] = "mainnet"
-TESTNET_ID: Final[str] = "testnet"
-
-# Cached configuration constants for reduced lookup overhead
-NETWORKS: Final[Dict[str, str]] = {
-    "ETH": "ethereum",
-    "BTC": "bitcoin",
-    "SOL": "solana",
-    "DOT": "polkadot"
+# Network identifiers
+NETWORKS: Dict[str, str] = {
+    "mainnet": "https://mainnet.infura.io/v3/",
+    "sepolia": "https://sepolia.infura.io/v3/",
 }
 
-# Transaction threshold limits
-MIN_TX_FEE: Final[float] = 0.00001
-MAX_TX_RETRY_COUNT: Final[int] = 3
+# Transaction constants
+DEFAULT_GAS_LIMIT: int = 21000
+MAX_RETRIES: int = 3
+TIMEOUT_SECONDS: int = 30
 
-# Formatting constants to optimize string concatenation operations
-DECIMAL_PRECISION: Final[int] = 8
-CURRENCY_SYMBOL: Final[str] = "$"
+# Application paths
+BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR: str = os.path.join(BASE_DIR, "logs")
 
-def get_network_name(ticker: str) -> str:
-    """Return network name from cache map."""
-    return NETWORKS.get(ticker.upper(), "unknown")
+# Crypto asset identifiers
+SUPPORTED_TOKENS = {
+    "ETH": "0x0000000000000000000000000000000000000000",
+    "USDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+}
 
-# Memory-mapped buffer sizes for batch processing
-BUFFER_SIZE_BYTES: Final[int] = 1024 * 64
-
-if __name__ == "__main__":
-    # Basic smoke test for constant access performance
-    print(f"Active network mapping size: {len(NETWORKS)}")
+# Security settings
+MIN_PASSWORD_LENGTH: int = 12
+PBKDF2_ITERATIONS: int = 600000
