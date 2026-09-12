@@ -1,35 +1,21 @@
-import json
 import os
-from typing import Any, Dict
+from typing import Dict, Any
+from dataclasses import dataclass
 
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "network": "mainnet",
-    "rpc_url": "https://eth.llamarpc.com",
-    "timeout": 30,
-    "max_retries": 3,
-    "enable_logging": True,
-    "gas_multiplier": 1.1
-}
+@dataclass
+class NetworkConfig:
+    mainnet_rpc: str = "https://mainnet.infura.io/v3/"
+    testnet_rpc: str = "https://sepolia.infura.io/v3/"
+    timeout: int = 30
 
-class ConfigLoader:
-    def __init__(self, config_path: str = "config.json"):
-        self.config_path = config_path
-        self.config = self._load_config()
+def load_environment_config() -> Dict[str, Any]:
+    """Extract sensitive wallet settings from system environment"""
+    return {
+        "rpc_url": os.getenv("RPC_URL", NetworkConfig.mainnet_rpc),
+        "api_key": os.getenv("WALLET_API_KEY", ""),
+        "timeout": int(os.getenv("REQUEST_TIMEOUT", NetworkConfig.timeout)),
+        "debug": os.getenv("DEBUG_MODE", "false").lower() == "true"
+    }
 
-    def _load_config(self) -> Dict[str, Any]:
-        """Loads configuration from a JSON file, merging with defaults."""
-        config = DEFAULT_CONFIG.copy()
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r") as f:
-                    file_config = json.load(f)
-                    if isinstance(file_config, dict):
-                        config.update(file_config)
-            except (json.JSONDecodeError, OSError):
-                # Fallback to defaults on error
-                pass
-        return config
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieves a configuration value by key with optional fallback."""
-        return self.config.get(key, default)
+# Global config instance for application lifecycle
+settings = load_environment_config()
